@@ -1,11 +1,11 @@
-use std::fs::File;
-use std::io::{BufRead, BufReader};
-use std::collections::VecDeque;
-use std::path::PathBuf;
 use anyhow::{Context, Result};
 use clap::Parser;
-use regex::Regex;
 use colored::*;
+use regex::Regex;
+use std::collections::VecDeque;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
+use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -41,6 +41,10 @@ struct Args {
     /// Disable colored output
     #[arg(long, default_value_t = false)]
     no_color: bool,
+
+    /// Show line numbers
+    #[arg(short = 'n', long, default_value_t = false)]
+    line_numbers: bool,
 }
 
 fn main() -> Result<()> {
@@ -52,8 +56,7 @@ fn main() -> Result<()> {
         args.pattern.clone()
     };
 
-    let regex = Regex::new(&pattern)
-        .context("Failed to create regex pattern")?;
+    let regex = Regex::new(&pattern).context("Failed to create regex pattern")?;
 
     if args.recursive {
         search_dir(&args.path, &regex, &args)?
@@ -65,23 +68,33 @@ fn main() -> Result<()> {
 }
 
 fn search_file(path: &PathBuf, regex: &Regex, args: &Args) -> Result<()> {
-    let file = File::open(path)
-        .with_context(|| format!("Failed to open file: {}", path.display()))?;
+    let file =
+        File::open(path).with_context(|| format!("Failed to open file: {}", path.display()))?;
     let reader = BufReader::new(file);
 
     // calculate actual context sizes
-    let before_ctx = args.context.unwrap_or(0).max(args.before_context.unwrap_or(0));
-    let after_ctx = args.context.unwrap_or(0).max(args.after_context.unwrap_or(0));
+    let before_ctx = args
+        .context
+        .unwrap_or(0)
+        .max(args.before_context.unwrap_or(0));
+    let after_ctx = args
+        .context
+        .unwrap_or(0)
+        .max(args.after_context.unwrap_or(0));
 
     let mut previous_lines: VecDeque<(usize, String)> = VecDeque::new();
     let mut print_after = 0;
     let mut last_printed: Option<usize> = None;
 
     // helper to print colored matches
-    fn print_line(path: &PathBuf, line: &str, regex: &Regex, no_color: bool) {
-        print!("{}:", path.display());
+    fn print_line(path: &PathBuf, line: &str, line_num: usize, regex: &Regex, args: &Args) {
+        if args.line_numbers {
+            print!("{}:{}: ", path.display(), line_num);
+        } else {
+            print!("{}:", path.display());
+        }
 
-        if no_color {
+        if args.no_color {
             println!("{}", line);
             return;
         }
@@ -97,22 +110,22 @@ fn search_file(path: &PathBuf, regex: &Regex, args: &Args) -> Result<()> {
         for m in matches {
             // text before match
             print!("{}", &line[last_match..m.start()]);
-            // print match in red
+            // match in red
             print!("{}", &line[m.start()..m.end()].red());
             last_match = m.end();
         }
 
-        // print remaining text after last match
+        // remaining text after last match
         println!("{}", &line[last_match..]);
     }
 
     for (line_num, line) in reader.lines().enumerate() {
         let line = line.context("Failed to read line")?;
-        let line_num = line_num + 1;    // line nums 1-based
+        let line_num = line_num + 1; // line nums 1-based
 
-        // if we need to print after-context from prev match
+        // if we need to print after-context from previous match
         if print_after > 0 {
-            print_line(path, &line, regex, args.no_color);
+            print_line(path, &line, line_num, regex, args);
             print_after -= 1;
             last_printed = Some(line_num);
             continue;
@@ -135,14 +148,14 @@ fn search_file(path: &PathBuf, regex: &Regex, args: &Args) -> Result<()> {
                 }
             }
 
-            // print before-context
-            for (_, context_line) in &previous_lines {
-                print_line(path, context_line, regex, args.no_color);
+            // before-context
+            for (num, context_line) in &previous_lines {
+                print_line(path, context_line, *num, regex, args);
             }
             previous_lines.clear();
 
-            // print matching line
-            print_line(path, &line, regex, args.no_color);
+            // matching line
+            print_line(path, &line, line_num, regex, args);
             last_printed = Some(line_num);
 
             // set up after-context

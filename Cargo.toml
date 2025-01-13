@@ -8,3 +8,4 @@ regex = "1.10.2"
 clap = { version = "4.4.11", features = ["derive"] }
 anyhow = "1.0.75"
 walkdir = "2.4.0"
+colored = "2.0"

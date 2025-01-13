@@ -2,31 +2,25 @@
 
 A simple grep implementation in Rust that searches files for patterns.
 
-## Quick Start
-```bash
-# search a file
-grep -p "pattern" -f file.txt
-
-# search with context
-grep -p "pattern" -f file.txt -C 2
-
-# search directory recursively
-grep -p "pattern" -f ./src -r
+## Usage
 ```
+Usage: grep [OPTIONS] --pattern <PATTERN> --path <PATH>
 
-## Options
-```
--p, --pattern        Pattern to search for
--f, --path           File/directory to search
--r, --recursive      Search directories recursively
--i, --ignore-case    Case insensitive search
--B NUM               Show NUM lines before match
--A NUM               Show NUM lines after match
--C NUM               Show NUM lines before and after match
+Options:
+  -p, --pattern <PATTERN>                The pattern to search for
+  -f, --path <PATH>                      The file/dir to search in
+  -r, --recursive                        Search recursively through directories
+  -i, --ignore-case                      Ignore case when matching
+  -B, --before-context <BEFORE_CONTEXT>  Print NUM lines of leading context
+  -A, --after-context <AFTER_CONTEXT>    Print NUM lines of trailing context
+  -C, --context <CONTEXT>                Print NUM lines of context
+      --no-color                         Disable colored output
+  -h, --help                             Print help
+  -V, --version                          Print version
 ```
 
 ## Build
-```bash
+```
 cargo build
 ```
 

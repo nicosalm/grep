@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 use clap::Parser;
 use regex::Regex;
+use colored::*;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -36,6 +37,10 @@ struct Args {
     /// Print NUM lines of context
     #[arg(short = 'C', long = "context")]
     context: Option<usize>,
+
+    /// Disable colored output
+    #[arg(long, default_value_t = false)]
+    no_color: bool,
 }
 
 fn main() -> Result<()> {
@@ -72,13 +77,42 @@ fn search_file(path: &PathBuf, regex: &Regex, args: &Args) -> Result<()> {
     let mut print_after = 0;
     let mut last_printed: Option<usize> = None;
 
+    // helper to print colored matches
+    fn print_line(path: &PathBuf, line: &str, regex: &Regex, no_color: bool) {
+        print!("{}:", path.display());
+
+        if no_color {
+            println!("{}", line);
+            return;
+        }
+
+        let mut last_match = 0;
+        let mut matches = regex.find_iter(line).peekable();
+
+        if matches.peek().is_none() {
+            println!("{}", line);
+            return;
+        }
+
+        for m in matches {
+            // text before match
+            print!("{}", &line[last_match..m.start()]);
+            // print match in red
+            print!("{}", &line[m.start()..m.end()].red());
+            last_match = m.end();
+        }
+
+        // print remaining text after last match
+        println!("{}", &line[last_match..]);
+    }
+
     for (line_num, line) in reader.lines().enumerate() {
         let line = line.context("Failed to read line")?;
         let line_num = line_num + 1;    // line nums 1-based
 
-        // if we need to print after-context from previous match
+        // if we need to print after-context from prev match
         if print_after > 0 {
-            println!("{}:{}", path.display(), line);
+            print_line(path, &line, regex, args.no_color);
             print_after -= 1;
             last_printed = Some(line_num);
             continue;
@@ -103,12 +137,12 @@ fn search_file(path: &PathBuf, regex: &Regex, args: &Args) -> Result<()> {
 
             // print before-context
             for (_, context_line) in &previous_lines {
-                println!("{}:{}", path.display(), context_line);
+                print_line(path, context_line, regex, args.no_color);
             }
             previous_lines.clear();
 
             // print matching line
-            println!("{}:{}", path.display(), line);
+            print_line(path, &line, regex, args.no_color);
             last_printed = Some(line_num);
 
             // set up after-context
